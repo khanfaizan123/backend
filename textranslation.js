@@ -7,7 +7,7 @@ const region = "uksouth";
 
 const translationClient = new TextTranslationClient(endpoint, {
   key: apiKey,
-  region,
+  region, 
 });
 
 async function translateText(text, from = "en", to = "fr") {

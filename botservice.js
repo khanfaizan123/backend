@@ -2,6 +2,8 @@ const { ActivityHandler, MessageFactory } = require("botbuilder");
 const { getChatCompletion } = require("./openaiservice");
 const { searchDocuments } = require("./searchService");
 const { getembeddingdata } = require("./textembeddingservice");
+const { translateText, detectLanguage } = require("./textranslation");
+
 class MyBot extends ActivityHandler {
   constructor() {
     super();
@@ -11,41 +13,39 @@ class MyBot extends ActivityHandler {
       const welcomeText = "Welcome to the bot! How can I assist you today?";
 
       for (let member of membersAdded) {
-        // If the added member is not the bot itself, send a welcome message 
         if (member.id !== context.activity.recipient.id) {
           await context.sendActivity(MessageFactory.text(welcomeText, welcomeText));
         }
       }
 
-      // By calling next, you ensure that the bot continues processing events
       await next();
     });
 
-
     this.onMessage(async (context, next) => {
-      const userMessage = context.activity.text;
-
-      const searchQuery = {
-        search: userMessage,
-      };
-
       try {
-       
-        const results = await getChatCompletion(userMessage);
+        let userMessage = context.activity.text;
+
+        // Detect the user's language
+        const userLanguage = await detectLanguage(userMessage);
+
+        // If the message is not in English, translate it to English
+        const translatedMessage = userLanguage !== "en" ? await translateText(userMessage, userLanguage, "en") : userMessage;
+
+        // Get the chat completion in English
+        const results = await getChatCompletion(translatedMessage);
         let replyText = "";
 
         if (results) {
-          replyText = `${results}`;
+          // Translate the response back to the user's language if necessary
+          replyText = userLanguage !== "en" ? await translateText(results, "en", userLanguage) : results;
         } else {
           replyText = "Sorry, I couldn't find any relevant information.";
         }
 
         await context.sendActivity(MessageFactory.text(replyText, replyText));
       } catch (error) {
-        console.log(error, "yha h");
-        await context.sendActivity(
-          "Sorry, there was an error processing your request."
-        );
+        console.log("Error:", error);
+        await context.sendActivity("Sorry, there was an error processing your request.");
       }
 
       await next();
